@@ -178,37 +178,23 @@ def get_gravity(planet_name: str) -> str:
 
 
 def get_distance_from_sun(planet_name: str) -> str:
-    """Gets distance of planet (or dwarf planet) from the sun, using Aphelion
-    or Distance from Sun, returning the raw number + unit as shown."""
     infobox_text = clean_text(get_first_infobox_text(get_page_html(planet_name)))
 
-    # Try in this order:
     patterns = [
-        # 1) Aphelion or Distance from Sun in million km
-        r"(?:aphelion|distance from sun)\s*[:\s]\s*(?P<dist>[\d,\.]+)\s*million\s*km",
-        # 2) Aphelion or Distance from Sun in km
-        r"(?:aphelion|distance from sun)\s*[:\s]\s*(?P<dist>[\d,\.]+)\s*km",
-        # 3) Semimajor axis (some dwarf planets use this)
-        r"semimajor\s*axis.*?(?P<dist>[\d,\.]+)\s*km",
-        # 4) Orbit (million km)
-        r"orbit.*?(?P<dist>[\d,\.]+)\s*million\s*km",
-        # 5) Fallback: any million-km value in the infobox
-        r"(?P<dist>[\d,\.]+)\s*million\s*km",
-        # 6) Final fallback: any km value in the infobox
-        r"(?P<dist>[\d,\.]+)\s*km",
+        r"(?:aphelion|distance from sun)\s*[:\s]\s*(?P<dist>[\d,\.]+)\s*(?P<unit>million\s*km|km)",
+        r"semimajor\s*axis.*?(?P<dist>[\d,\.]+)\s*(?P<unit>km)",
+        r"(?P<dist>[\d,\.]+)\s*(?P<unit>million\s*km|km)",
     ]
 
     for pat in patterns:
         try:
             m = get_match(infobox_text, pat, "")
-            # return the raw number + unit so users see exactly what the page says:
-            unit = "million km" if "million" in pat else "km"
-            return f"{m.group('dist')} {unit}"
+            return f"{m.group('dist')} {m.group('unit')}"
         except AttributeError:
             continue
 
-    # nothing matched
-    raise AttributeError("Page infobox has no distance‐from‐sun information")
+    raise AttributeError("Page infobox has no distance-from-sun information")
+
 
 
 
