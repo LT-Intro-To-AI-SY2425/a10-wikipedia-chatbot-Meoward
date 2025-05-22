@@ -161,6 +161,75 @@ def death_date(matches: List[str]) -> List[str]:
     """
     return [get_death_date(" ".join(matches))]
 
+def get_gravity(planet_name: str) -> str:
+    """Gets the gravity of the given planet
+
+    Args: 
+        planet_name - name of the planet to get gravity of
+
+    Returns:
+        gravity of the given planet
+    """
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(planet_name)))
+    pattern = r"(?:Gravity.*?)(?P<gravity>[\d,.]+)(?:.*?)m/s"
+    error_text = "Page infobox has no gravity information"
+    match = get_match(infobox_text, pattern, error_text)
+    return match.group("gravity") + " m/s²"
+
+
+def get_distance_from_sun(planet_name: str) -> str:
+    """Gets distance of planet (or dwarf planet) from the sun, using Aphelion
+    or Distance from Sun, returning the raw number + unit as shown."""
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(planet_name)))
+
+    # Try in this order:
+    patterns = [
+        # 1) Aphelion or Distance from Sun in million km
+        r"(?:aphelion|distance from sun)\s*[:\s]\s*(?P<dist>[\d,\.]+)\s*million\s*km",
+        # 2) Aphelion or Distance from Sun in km
+        r"(?:aphelion|distance from sun)\s*[:\s]\s*(?P<dist>[\d,\.]+)\s*km",
+        # 3) Semimajor axis (some dwarf planets use this)
+        r"semimajor\s*axis.*?(?P<dist>[\d,\.]+)\s*km",
+        # 4) Orbit (million km)
+        r"orbit.*?(?P<dist>[\d,\.]+)\s*million\s*km",
+        # 5) Fallback: any million-km value in the infobox
+        r"(?P<dist>[\d,\.]+)\s*million\s*km",
+        # 6) Final fallback: any km value in the infobox
+        r"(?P<dist>[\d,\.]+)\s*km",
+    ]
+
+    for pat in patterns:
+        try:
+            m = get_match(infobox_text, pat, "")
+            # return the raw number + unit so users see exactly what the page says:
+            unit = "million km" if "million" in pat else "km"
+            return f"{m.group('dist')} {unit}"
+        except AttributeError:
+            continue
+
+    # nothing matched
+    raise AttributeError("Page infobox has no distance‐from‐sun information")
+
+
+
+def gravity(matches: List[str]) -> List[str]:
+    """Returns gravity of planet in matches
+
+    Args: 
+        matches - match from pattern of planet to find gravity of
+
+    Returns:
+        gravity of planet
+    """
+    return [get_gravity(matches[0])]
+
+def distance_from_sun(matches: List[str]) -> List[str]:
+    """Returns distance from the sun of planet in matches"""
+    return [get_distance_from_sun(matches[0])]
+
+
+
+
 
 # dummy argument is ignored and doesn't matter
 def bye_action(dummy: List[str]) -> None:
@@ -175,11 +244,14 @@ Action = Callable[[List[str]], List[Any]]
 # The pattern-action list for the natural language query system. It must be declared
 # here, after all of the function definitions
 pa_list: List[Tuple[Pattern, Action]] = [
-    ("when was % born".split(),      birth_date),
+    ("when was % born".split(), birth_date),
     ("what is the polar radius of %".split(), polar_radius),
-    ("when did % die".split(),       death_date),   # ← make sure this comma is here!
-    (["bye"],                        bye_action),
+    ("when did % die".split(), death_date),
+    ("what is the gravity of %".split(), gravity),
+    ("how far is % from the sun".split(), distance_from_sun),
+    (["bye"], bye_action),
 ]
+
 
 def search_pa_list(src: List[str]) -> List[str]:
     # debug: show exactly what patterns we're testing
