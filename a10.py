@@ -7,7 +7,7 @@ from nltk.tree import Tree
 from match import match
 from typing import List, Callable, Tuple, Any, Match
 
-
+print("LOADING BOT MODULE!")
 def get_page_html(title: str) -> str:
     """Gets html of a wikipedia page
 
@@ -140,6 +140,27 @@ def polar_radius(matches: List[str]) -> List[str]:
     """
     return [get_polar_radius(matches[0])]
 
+def get_death_date(name: str) -> str:
+    infobox_text = clean_text(get_first_infobox_text(get_page_html(name)))
+    pattern = r"(?:Died\D*?)(?P<death>[A-Za-z]+\s+\d{1,2},\s+\d{4})"
+
+    error_text = "Page infobox has no death information (in 'Month DD, YYYY' format)"
+    match = get_match(infobox_text, pattern, error_text)
+    return match.group("death")
+
+
+
+def death_date(matches: List[str]) -> List[str]:
+    """Reaturns date of death of the named person in matches
+
+    Args:
+        matches - match from pattern of person's name to find date of death
+    
+    Returns: 
+        date of death of named person
+    """
+    return [get_death_date(" ".join(matches))]
+
 
 # dummy argument is ignored and doesn't matter
 def bye_action(dummy: List[str]) -> None:
@@ -154,50 +175,40 @@ Action = Callable[[List[str]], List[Any]]
 # The pattern-action list for the natural language query system. It must be declared
 # here, after all of the function definitions
 pa_list: List[Tuple[Pattern, Action]] = [
-    ("when was % born".split(), birth_date),
+    ("when was % born".split(),      birth_date),
     ("what is the polar radius of %".split(), polar_radius),
-    (["bye"], bye_action),
+    ("when did % die".split(),       death_date),   # ← make sure this comma is here!
+    (["bye"],                        bye_action),
 ]
 
-
 def search_pa_list(src: List[str]) -> List[str]:
-    """Takes source, finds matching pattern and calls corresponding action. If it finds
-    a match but has no answers it returns ["No answers"]. If it finds no match it
-    returns ["I don't understand"].
-
-    Args:
-        source - a phrase represented as a list of words (strings)
-
-    Returns:
-        a list of answers. Will be ["I don't understand"] if it finds no matches and
-        ["No answers"] if it finds a match but no answers
-    """
+    # debug: show exactly what patterns we're testing
+    print("PATTERNS:", [pat for pat, _ in pa_list])
     for pat, act in pa_list:
+        print(f"Trying {pat} against {src}")
         mat = match(pat, src)
         if mat is not None:
-            answer = act(mat)
-            return answer if answer else ["No answers"]
-
+            print(f"  matched → {mat}")
+            return act(mat) or ["No answers"]
     return ["I don't understand"]
+
+def normalize(question: str) -> List[str]:
+    cleaned = re.sub(r"[^\w\s]", "", question)
+    return cleaned.lower().split()
 
 
 def query_loop() -> None:
-    """The simple query loop. The try/except structure is to catch Ctrl-C or Ctrl-D
-    characters and exit gracefully"""
-    print("Welcome to the movie database!\n")
+    print("Welcome to the Wikipedia bot!\n")
     while True:
         try:
-            print()
-            query = input("Your query? ").replace("?", "").lower().split()
-            answers = search_pa_list(query)
+            raw = input("Your query? ")
+            tokens = normalize(raw)
+            answers = search_pa_list(tokens)
             for ans in answers:
                 print(ans)
-
         except (KeyboardInterrupt, EOFError):
             break
-
     print("\nSo long!\n")
-
 
 # uncomment the next line once you've implemented everything are ready to try it out
 query_loop()
