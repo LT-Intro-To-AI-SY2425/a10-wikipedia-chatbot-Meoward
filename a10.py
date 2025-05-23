@@ -177,25 +177,6 @@ def get_gravity(planet_name: str) -> str:
     return match.group("gravity") + " m/s²"
 
 
-def get_distance_from_sun(planet_name: str) -> str:
-    infobox_text = clean_text(get_first_infobox_text(get_page_html(planet_name)))
-
-    patterns = [
-        r"(?:aphelion|distance from sun)\s*[:\s]\s*(?P<dist>[\d,\.]+)\s*(?P<unit>million\s*km|km)",
-        r"semimajor\s*axis.*?(?P<dist>[\d,\.]+)\s*(?P<unit>km)",
-        r"(?P<dist>[\d,\.]+)\s*(?P<unit>million\s*km|km)",
-    ]
-
-    for pat in patterns:
-        try:
-            m = get_match(infobox_text, pat, "")
-            return f"{m.group('dist')} {m.group('unit')}"
-        except AttributeError:
-            continue
-
-    raise AttributeError("Page infobox has no distance-from-sun information")
-
-
 
 
 def gravity(matches: List[str]) -> List[str]:
@@ -209,11 +190,32 @@ def gravity(matches: List[str]) -> List[str]:
     """
     return [get_gravity(matches[0])]
 
-def distance_from_sun(matches: List[str]) -> List[str]:
-    """Returns distance from the sun of planet in matches"""
-    return [get_distance_from_sun(matches[0])]
+import datetime
 
+def get_age(name: str) -> str:
+    """Compute age of a person given their Wikipedia infobox birth (and death) dates."""
+    # parse birth date (expects YYYY-MM-DD)
+    birth_str = get_birth_date(name)
+    birth = datetime.datetime.strptime(birth_str, "%Y-%m-%d").date()
 
+    # try to get death date; if missing, use today
+    try:
+        death_str = get_death_date(name)
+        end = datetime.datetime.strptime(death_str, "%Y-%m-%d").date()
+    except AttributeError:
+        end = datetime.date.today()  # uses system date
+
+    # compute full years difference
+    years = end.year - birth.year
+    # subtract one if we haven’t reached birthday this year
+    if (end.month, end.day) < (birth.month, birth.day):
+        years -= 1
+
+    return str(years)
+
+def age(matches: List[str]) -> List[str]:
+    """Returns age of the named person in matches."""
+    return [get_age(" ".join(matches))]
 
 
 
@@ -234,7 +236,7 @@ pa_list: List[Tuple[Pattern, Action]] = [
     ("what is the polar radius of %".split(), polar_radius),
     ("when did % die".split(), death_date),
     ("what is the gravity of %".split(), gravity),
-    ("how far is % from the sun".split(), distance_from_sun),
+    ("how old is %".split(), age),    
     (["bye"], bye_action),
 ]
 
